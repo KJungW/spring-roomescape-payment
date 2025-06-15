@@ -1,0 +1,45 @@
+= API 문서
+:toc: left
+:doctype: book
+
+== 인증 API
+
+=== 로그인
+
+==== 로그인 (성공)
+include::{snippets}/login/http-request.adoc[]
+include::{snippets}/login/http-response.adoc[]
+include::{snippets}/login/request-fields.adoc[]
+include::{snippets}/login/response-headers.adoc[]
+
+==== 로그인 (실패 : 계정이 존재하지 않는 경우)
+include::{snippets}/login/duplicated_email/http-request.adoc[]
+include::{snippets}/login/duplicated_email/http-response.adoc[]
+
+==== 로그인 (실패 : 비밀번호가 맞지 않는 경우)
+include::{snippets}/login/incorrect_password/http-request.adoc[]
+include::{snippets}/login/incorrect_password/http-response.adoc[]
+
+=== 로그인 체크
+
+==== 로그인 체크 (성공)
+include::{snippets}/login_check/http-request.adoc[]
+include::{snippets}/login_check/http-response.adoc[]
+include::{snippets}/login_check/request-headers.adoc[]
+include::{snippets}/login_check/response-fields.adoc[]
+
+==== 로그인 체크 (실패 : 엑세스 토큰이 존재하지 않음)
+include::{snippets}/login_check/empty_access_token/http-request.adoc[]
+include::{snippets}/login_check/empty_access_token/http-response.adoc[]
+
+==== 로그인 체크 (실패 : 엑세스 토큰이 존재하지 않음)
+include::{snippets}/login_check/expired_token/http-request.adoc[]
+include::{snippets}/login_check/expired_token/http-response.adoc[]
+
+==== 로그인 체크 (실패 : 엑세스 토큰이 수정된 경우)
+include::{snippets}/login_check/damaged_access_token/http-request.adoc[]
+include::{snippets}/login_check/damaged_access_token/http-response.adoc[]
+
+=== 로그아웃
+include::{snippets}/logout/http-request.adoc[]
+include::{snippets}/logout/http-response.adoc[]

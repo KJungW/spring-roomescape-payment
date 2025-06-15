@@ -1,7 +1,12 @@
 plugins {
     id 'org.springframework.boot' version '3.4.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.asciidoctor.jvm.convert' version '3.3.2'
     id 'java'
+}
+
+ext {
+    snippetsDir = file('build/generated-snippets')
 }
 
 group = 'nextstep'
@@ -24,6 +29,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
+    testImplementation 'org.springframework.restdocs:spring-restdocs-restassured'
 
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
@@ -38,5 +44,12 @@ dependencies {
 }
 
 test {
+    outputs.dir snippetsDir
     useJUnitPlatform()
+}
+
+asciidoctor {
+    inputs.dir snippetsDir
+    attributes "snippets": snippetsDir
+    dependsOn test
 }

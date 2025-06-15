@@ -2,20 +2,33 @@ package roomescape.domain.auth.controller;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.springframework.restdocs.headers.HeaderDocumentation.headerWithName;
+import static org.springframework.restdocs.headers.HeaderDocumentation.requestHeaders;
+import static org.springframework.restdocs.headers.HeaderDocumentation.responseHeaders;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
+import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.restassured.RestAssuredRestDocumentation.document;
+import static org.springframework.restdocs.restassured.RestAssuredRestDocumentation.documentationConfiguration;
 
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
+import org.springframework.restdocs.RestDocumentationContextProvider;
+import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.test.context.ActiveProfiles;
 import roomescape.domain.auth.dto.AccessTokenContent;
 import roomescape.domain.member.domain.Member;
@@ -23,6 +36,8 @@ import roomescape.domain.member.domain.Role;
 import roomescape.domain.member.repository.MemberRepository;
 import roomescape.utility.JwtTokenProvider;
 
+@ExtendWith(RestDocumentationExtension.class)
+@AutoConfigureRestDocs
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 public class AuthApiTest {
@@ -34,9 +49,17 @@ public class AuthApiTest {
     private MemberRepository memberRepository;
     @Autowired
     public JwtTokenProvider tokenProvider;
+    @Autowired
+    private RestDocumentationContextProvider restDocumentation;
+
+    @BeforeEach
+    void setup() {
+        RestAssured.filters(documentationConfiguration(restDocumentation));
+    }
 
     @AfterEach
-    void setup() {
+    void afterEach() {
+        RestAssured.reset();
         memberRepository.deleteAll();
     }
 
@@ -61,7 +84,18 @@ public class AuthApiTest {
                     .contentType(ContentType.JSON)
                     .port(port)
                     .body(params)
-                    .when().post("/login")
+                    .filter(document(
+                            "login",
+                            requestFields(
+                                    fieldWithPath("email").description("사용자 이메일"),
+                                    fieldWithPath("password").description("사용자 비밀번호")
+                            ),
+                            responseHeaders(
+                                    headerWithName("Set-Cookie").description("access 쿠키 : access 토큰이 담김")
+                            )
+                    ))
+                    .when()
+                    .post("/login")
                     .then().log().all()
                     .statusCode(HttpStatus.OK.value())
                     .cookie("access", notNullValue());
@@ -81,6 +115,7 @@ public class AuthApiTest {
                     .contentType(ContentType.JSON)
                     .port(port)
                     .body(params)
+                    .filter(document("login/duplicated_email"))
                     .when().post("/login")
                     .then().log().all()
                     .statusCode(HttpStatus.BAD_REQUEST.value());
@@ -100,9 +135,11 @@ public class AuthApiTest {
             // when & then
             RestAssured
                     .given().log().all()
+                    .filter(document("login"))
                     .contentType(ContentType.JSON)
                     .port(port)
                     .body(params)
+                    .filter(document("login/incorrect_password"))
                     .when().post("/login")
                     .then().log().all()
                     .statusCode(HttpStatus.BAD_REQUEST.value());
@@ -125,7 +162,18 @@ public class AuthApiTest {
                     .given().log().all()
                     .contentType(ContentType.JSON)
                     .port(port)
-                    .cookie("access", accessToken)
+                    .header("Cookie", "access=" + accessToken)
+                    .filter(document(
+                            "login_check",
+                            requestHeaders(
+                                    headerWithName("cookie").description("access 쿠키 : 인증을 위한 엑세스 토큰이 담김")
+                            ),
+                            responseFields(
+                                    fieldWithPath("id").description("회원 ID"),
+                                    fieldWithPath("roleName").description("회원 권한명"),
+                                    fieldWithPath("name").description("회원 이름")
+                            )
+                    ))
                     .when().get("/login/check")
                     .then().log().all()
                     .statusCode(HttpStatus.OK.value())
@@ -140,6 +188,7 @@ public class AuthApiTest {
                     .given().log().all()
                     .contentType(ContentType.JSON)
                     .port(port)
+                    .filter(document("login_check/empty_access_token"))
                     .when().get("/login/check")
                     .then().log().all()
                     .statusCode(HttpStatus.UNAUTHORIZED.value());
@@ -151,14 +200,15 @@ public class AuthApiTest {
             // given
             tokenProvider = new JwtTokenProvider("test_secret_key_test_secret_key_test_secret_key_test_secret_key", 0);
             AccessTokenContent tokenContent = new AccessTokenContent(1L, Role.GENERAL, "회원");
-            String expiredTokenProvider = tokenProvider.createAccessToken(tokenContent);
+            String expiredToken = tokenProvider.createAccessToken(tokenContent);
 
             // when & then
             RestAssured
                     .given().log().all()
                     .contentType(ContentType.JSON)
                     .port(port)
-                    .cookie("access", expiredTokenProvider)
+                    .header("Cookie", "access=" + expiredToken)
+                    .filter(document("login_check/expired_token"))
                     .when().get("/login/check")
                     .then().log().all()
                     .statusCode(HttpStatus.UNAUTHORIZED.value());
@@ -178,7 +228,8 @@ public class AuthApiTest {
                     .given().log().all()
                     .contentType(ContentType.JSON)
                     .port(port)
-                    .cookie("access", damagedAccessToken)
+                    .header("Cookie", "access=" + damagedAccessToken)
+                    .filter(document("login_check/damaged_access_token"))
                     .when().get("/login/check")
                     .then().log().all()
                     .statusCode(HttpStatus.UNAUTHORIZED.value());
@@ -195,6 +246,7 @@ public class AuthApiTest {
         // when & then
         RestAssured
                 .given().log().all()
+                .filter(document("logout"))
                 .contentType(ContentType.JSON)
                 .port(port)
                 .cookie("access", accessToken)
